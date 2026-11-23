@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tube Status">
+<meta name="application-name" content="Tube Status">
+<meta name="theme-color" content="#0d0d0f">
+<title>Tube Status</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root{
+    --bg:#0d0d0f;
+    --surface:#17171b;
+    --surface-2:#1f1f24;
+    --hairline:#2a2a30;
+    --ink:#f2f1ed;
+    --ink-dim:#9a9aa2;
+    --ink-faint:#5e5e66;
+    --good:#2bb673;
+    --minor:#e8a23d;
+    --severe:#e85d4f;
+    --strike:#e85d4f;
+    --strike-bg:rgba(232,93,79,0.10);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang HK","Noto Sans TC","Helvetica Neue",Arial,sans-serif;
+    overscroll-behavior-y:none;
+    height:100%;
+  }
+  body{display:flex; flex-direction:column; min-height:100vh;}
+  button{font-family:inherit; cursor:pointer;}
+  header{
+    padding:calc(var(--safe-top) + 14px) 20px 14px;
+    background:var(--bg);
+    position:sticky; top:0; z-index:10;
+    border-bottom:1px solid var(--hairline);
+  }
+  .app-icon{
+    width:36px; height:36px; flex:0 0 auto; border-radius:9px; display:block;
+  }
+  .header-row{display:flex; align-items:center; gap:12px;}
+  .title-block{flex:1; min-width:0;}
+  h1{margin:0; font-size:21px; font-weight:800; letter-spacing:-0.01em;}
+  .updated{
+    margin-top:2px; font-size:12.5px; color:var(--ink-faint);
+    display:flex; align-items:center; gap:6px;
+  }
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--good); flex:0 0 auto;}
+  .dot.stale{background:var(--minor);}
+  .dot.error{background:var(--severe);}
+  .icon-btn{
+    width:34px; height:34px; border-radius:50%;
+    background:var(--surface-2); border:none; color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    flex:0 0 auto;
+  }
+  .icon-btn svg{width:16px;height:16px;}
+  .install-btn{
+    display:none; height:30px; padding:0 12px; border-radius:15px;
+    background:var(--ink); color:var(--bg); border:none; font-size:12.5px; font-weight:700;
+  }
+  .install-btn.show{display:block;}
+  .refresh-btn.spinning svg{animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .summary-strip{
+    margin-top:14px; display:flex; gap:6px; overflow-x:auto;
+    padding-bottom:2px; scrollbar-width:none;
+  }
+  .summary-strip::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:0 0 auto; padding:6px 11px; border-radius:20px;
+    font-size:12.5px; font-weight:600; border:none;
+    background:var(--surface-2); color:var(--ink-dim); white-space:nowrap;
+  }
+  .chip.active{background:var(--ink); color:var(--bg);}
+  .chip.strike-chip.has{color:var(--strike);}
+  .chip.strike-chip.has.active{background:var(--strike); color:#fff;}
+  .chip .count{margin-left:2px;}
+  main{flex:1; padding:14px 14px calc(var(--safe-bottom) + 24px);}
+  .section-label{
+    font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--ink-faint); margin:18px 6px 8px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .section-label:first-child{margin-top:4px;}
+  .section-label.strike{color:var(--strike);}
+  .line-card{
+    background:var(--surface); border-radius:14px; margin-bottom:8px;
+    overflow:hidden; border:1px solid var(--hairline);
+  }
+  .line-row{display:flex; align-items:center; gap:12px; padding:13px 14px;}
+  .line-bar{width:7px; height:30px; border-radius:4px; flex:0 0 auto;}
+  .line-info{flex:1; min-width:0;}
+  .line-name{font-size:15.5px; font-weight:700; letter-spacing:-0.005em;}
+  .line-status{font-size:13px; margin-top:1px; display:flex; align-items:center; gap:5px;}
+  .status-dot{width:7px;height:7px;border-radius:50%; flex:0 0 auto;}
+  .status-text{color:var(--ink-dim);}
+  .status-text.good{color:var(--good);}
+  .status-text.minor{color:var(--minor);}
+  .status-text.severe{color:var(--severe);}
+  .status-text.closed{color:var(--ink-faint);}
+  .strike-tag{
+    font-size:11px; font-weight:700; padding:1px 6px; border-radius:6px;
+    background:var(--strike-bg); color:var(--strike); margin-left:4px;
+  }
+  .chevron{
+    width:8px; height:8px;
+    border-right:1.8px solid var(--ink-faint); border-bottom:1.8px solid var(--ink-faint);
+    transform:rotate(-45deg); flex:0 0 auto; transition:transform 0.2s ease; margin-right:2px;
+  }
+  .line-card.expanded .chevron{transform:rotate(45deg);}
+  .line-detail{max-height:0; overflow:hidden; transition:max-height 0.25s ease;}
+  .line-card.expanded .line-detail{max-height:900px;}
+  .line-detail-inner{
+    padding:11px 14px 14px 33px; font-size:13.5px; line-height:1.6;
+    color:var(--ink-dim); border-top:1px solid var(--hairline);
+  }
+  .msg + .msg{margin-top:10px;}
+  .orig-toggle{
+    margin-top:10px; background:none; border:none; padding:0;
+    color:var(--ink-faint); font-size:12px; text-decoration:underline;
+  }
+  .orig{display:none; margin-top:6px; font-size:12px; color:var(--ink-faint); line-height:1.5;}
+  .orig.show{display:block;}
+
+  /* 罷工卡 */
+  .strike-card{
+    background:var(--surface); border:1px solid rgba(232,93,79,0.35);
+    border-radius:14px; padding:13px 14px; margin-bottom:8px;
+  }
+  .strike-top{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .strike-badge{
+    font-size:11.5px; font-weight:800; color:#fff; background:var(--strike);
+    padding:2px 8px; border-radius:7px;
+  }
+  .strike-badge.now{animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{50%{opacity:0.55;}}
+  .strike-lines{display:flex; flex-wrap:wrap; gap:6px; margin-top:9px;}
+  .line-pill{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:12.5px; font-weight:600; color:var(--ink);
+    background:var(--surface-2); padding:3px 9px 3px 6px; border-radius:10px;
+  }
+  .line-pill i{width:9px; height:9px; border-radius:3px; display:block;}
+  .strike-dates{margin-top:9px; font-size:13px; font-weight:600; color:var(--ink);}
+  .strike-dates div + div{margin-top:2px;}
+  .strike-msg{margin-top:7px; font-size:13.5px; line-height:1.6; color:var(--ink-dim);}
+  .strike-empty{
+    background:var(--surface); border:1px solid var(--hairline); border-radius:14px;
+    padding:13px 14px; font-size:13.5px; color:var(--ink-dim); margin-bottom:8px;
+  }
+
+  .install-tip{
+    display:none; margin:0 0 12px; padding:12px 14px; border-radius:14px;
+    background:var(--surface); border:1px solid var(--hairline);
+    font-size:13px; line-height:1.6; color:var(--ink-dim); position:relative; padding-right:34px;
+  }
+  .install-tip.show{display:block;}
+  .install-tip b{color:var(--ink);}
+  .install-tip .x{position:absolute; top:6px; right:8px; background:none; border:none; color:var(--ink-faint); font-size:18px; padding:4px 8px;}
+  .state-block{text-align:center; padding:60px 24px; color:var(--ink-faint);}
+  .state-block .big{font-size:15px; color:var(--ink-dim); margin-bottom:6px; font-weight:600;}
+  .state-block .small{font-size:13px; line-height:1.5;}
+  .spinner-ring{
+    width:28px;height:28px; margin:0 auto 16px; border-radius:50%;
+    border:2.5px solid var(--hairline); border-top-color:var(--ink-dim);
+    animation:spin 0.8s linear infinite;
+  }
+  .retry-btn{
+    margin-top:16px; padding:9px 20px; border-radius:20px;
+    background:var(--surface-2); color:var(--ink); border:none;
+    font-size:13.5px; font-weight:600;
+  }
+  footer{
+    text-align:center; padding:4px 16px calc(var(--safe-bottom) + 14px);
+    font-size:11px; color:var(--ink-faint); line-height:1.7;
+  }
+  footer a{color:var(--ink-dim);}
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#f4f3f0; --surface:#ffffff; --surface-2:#ebebe8; --hairline:#e2e1dd;
+      --ink:#15151a; --ink-dim:#5f5f68; --ink-faint:#9a9aa2;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <img class="app-icon" src="icons/icon-192.png" alt="">
+    <div class="title-block">
+      <h1>Tube Status</h1>
+      <div class="updated">
+        <span class="dot" id="updatedDot"></span>
+        <span id="updatedText">正在載入即時資料…</span>
+      </div>
+    </div>
+    <button class="install-btn" id="installBtn">安裝</button>
+    <button class="icon-btn refresh-btn" id="refreshBtn" aria-label="重新整理">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+        <path d="M21 3v6h-6"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="summary-strip" id="filterStrip">
+    <button class="chip active" data-filter="all">全部 <span class="count" id="cAll">–</span></button>
+    <button class="chip strike-chip" data-filter="strike" id="strikeChip">罷工 <span class="count" id="cStrike">–</span></button>
+    <button class="chip" data-filter="disrupted">有延誤 <span class="count" id="cDisrupted">–</span></button>
+    <button class="chip" data-filter="good">正常 <span class="count" id="cGood">–</span></button>
+  </div>
+</header>
+
+<div id="installTip" class="install-tip" style="margin:12px 14px 0"></div>
+<main id="main">
+  <div class="state-block">
+    <div class="spinner-ring"></div>
+    <div class="big">正在向 TfL 取得資料</div>
+    <div class="small">London Underground · Overground · DLR · Elizabeth line</div>
+  </div>
+</main>
+
+<footer id="footer" style="display:none">
+  資料來源：TfL Unified API · 即時狀況每 30 秒更新 · 罷工消息每 15 分鐘更新<br>
+  <a href="https://tfl.gov.uk/campaign/strikes" target="_blank" rel="noopener">TfL 官方罷工資訊頁</a>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- 線路資料（官方顏色）----------
+  var LINE_META = {
+    "bakerloo":        {name:"Bakerloo 線",        color:"#B36305"},
+    "central":         {name:"Central 線",         color:"#E32017"},
+    "circle":          {name:"Circle 線",          color:"#FFD300"},
+    "district":        {name:"District 線",        color:"#00782A"},
+    "hammersmith-city":{name:"Hammersmith & City 線",color:"#F3A9BB"},
+    "jubilee":         {name:"Jubilee 線",         color:"#A0A5A9"},
+    "metropolitan":    {name:"Metropolitan 線",    color:"#9B0056"},
+    "northern":        {name:"Northern 線",        color:"#000000"},
+    "piccadilly":      {name:"Piccadilly 線",      color:"#003688"},
+    "victoria":        {name:"Victoria 線",        color:"#0098D4"},
+    "waterloo-city":   {name:"Waterloo & City 線", color:"#95CDBA"},
+    "elizabeth":       {name:"Elizabeth 線",       color:"#6950A1"},
+    "dlr":             {name:"DLR",                color:"#00A4A7"},
+    "liberty":         {name:"Liberty 線",         color:"#5D6061"},
+    "lioness":         {name:"Lioness 線",         color:"#FAA61A"},
+    "mildmay":         {name:"Mildmay 線",         color:"#0077AD"},
+    "suffragette":     {name:"Suffragette 線",     color:"#5BBD72"},
+    "weaver":          {name:"Weaver 線",          color:"#823A62"},
+    "windrush":        {name:"Windrush 線",        color:"#EF4D5E"},
+    "london-overground":{name:"London Overground", color:"#EE7C0E"},
+    "tram":            {name:"London Trams",       color:"#84B817"}
+  };
+
+  var API_BASE = "https://api.tfl.gov.uk";
+  var MODES = "tube,overground,dlr,elizabeth-line,tram";
+  var REFRESH_MS = 30000;
+  var STRIKE_REFRESH_MS = 15 * 60 * 1000;
+  var STRIKE_DAYS = 30;
+  var STRIKE_RE = /strike|industrial action|walk.?out/i;
+
+  var currentFilter = "all";
+  var lastData = null;
+  var strikeData = null;     // null = 未載入, [] = 無罷工
+  var strikeError = false;
+  var lastStrikeFetch = 0;
+  var refreshTimer = null;
+
+  // ---------- 示範模式（網址加 ?demo）----------
+  var DEMO_MODE = /[?&]demo\b/.test(location.search);
+  function demoDate(d, h){ var t = new Date(); t.setDate(t.getDate()+d); t.setHours(h,0,0,0); return t.toISOString(); }
+  var DEMO_DATA = [
+    {id:"bakerloo", name:"Bakerloo", lineStatuses:[{statusSeverity:10, statusSeverityDescription:"Good Service", reason:""}]},
+    {id:"central", name:"Central", lineStatuses:[{statusSeverity:9, statusSeverityDescription:"Minor Delays", reason:"Central Line: Minor delays due to train cancellations."}]},
+    {id:"victoria", name:"Victoria", lineStatuses:[{statusSeverity:6, statusSeverityDescription:"Severe Delays", reason:"Victoria Line: Severe delays due to an earlier signal failure at Brixton. Tickets will be accepted on London Buses."}]},
+    {id:"district", name:"District", lineStatuses:[{statusSeverity:3, statusSeverityDescription:"Part Suspended", reason:"District Line: No service between Barking and Upminster while we fix a signal failure at Upminster. GOOD SERVICE on the rest of the line."}]},
+    {id:"circle", name:"Circle", lineStatuses:[{statusSeverity:9, statusSeverityDescription:"Reduced Service", reason:"Circle Line: Reduced service because of a shortage of train operators."}]},
+    {id:"elizabeth", name:"Elizabeth", lineStatuses:[{statusSeverity:5, statusSeverityDescription:"Part Closure", reason:"Elizabeth line: No service between Paddington and Heathrow Terminal 5 due to planned engineering works. Replacement buses operate."}]},
+    {id:"northern", name:"Northern", lineStatuses:[{statusSeverity:9, statusSeverityDescription:"Minor Delays", reason:"Northern Line: Minor delays due to an earlier customer incident at Camden Town."}]},
+    {id:"piccadilly", name:"Piccadilly", lineStatuses:[{statusSeverity:6, statusSeverityDescription:"Severe Delays", reason:"Piccadilly Line: Severe delays towards Cockfosters due to a faulty train at Hatton Cross."}]},
+    {id:"dlr", name:"DLR", lineStatuses:[{statusSeverity:10, statusSeverityDescription:"Good Service", reason:""}]},
+    {id:"windrush", name:"Windrush", lineStatuses:[{statusSeverity:5, statusSeverityDescription:"Part Closure", reason:"Windrush line: Part closure while we fix a signal failure at New Cross Gate."}]}
+  ];
+  var DEMO_FUTURE = [
+    {id:"central", lineStatuses:[{statusSeverity:20, statusSeverityDescription:"Service Closed",
+      reason:"STRIKE: Expect no service on the whole Central line due to strike action by RMT members. Please check before you travel and allow extra time.",
+      validityPeriods:[{fromDate:demoDate(9,4), toDate:demoDate(9,23)},{fromDate:demoDate(11,4), toDate:demoDate(11,23)}]}]},
+    {id:"jubilee", lineStatuses:[{statusSeverity:20, statusSeverityDescription:"Service Closed",
+      reason:"STRIKE: Expect no service on the whole Jubilee line due to strike action by RMT members. Please check before you travel and allow extra time.",
+      validityPeriods:[{fromDate:demoDate(9,4), toDate:demoDate(9,23)},{fromDate:demoDate(11,4), toDate:demoDate(11,23)}]}]},
+    {id:"dlr", lineStatuses:[{statusSeverity:7, statusSeverityDescription:"Reduced Service",
+      reason:"DLR: Due to industrial action, a reduced service will operate between Bank and Lewisham. Trains will start later and finish early.",
+      validityPeriods:[{fromDate:demoDate(16,5), toDate:demoDate(16,22)}]}]}
+  ];
+
+  var $main = document.getElementById('main');
+  var $footer = document.getElementById('footer');
+  var $updatedText = document.getElementById('updatedText');
+  var $updatedDot = document.getElementById('updatedDot');
+  var $refreshBtn = document.getElementById('refreshBtn');
+  var $filterStrip = document.getElementById('filterStrip');
+
+  function escapeHtml(str){
+    var d = document.createElement('div');
+    d.textContent = str == null ? "" : String(str);
+    return d.innerHTML;
+  }
+  function metaFor(id, name){
+    return LINE_META[id] || {name: name || id, color:"#888888"};
+  }
+
+  // ---------- 狀態分類 ----------
+  function severityBucket(sev){
+    if (sev >= 10 && sev !== 20) return "good";
+    if (sev >= 7 && sev <= 9) return "minor";
+    return "severe";
+  }
+  function classify(line){
+    var statuses = line.lineStatuses || [];
+    if (statuses.length === 0) return {bucket:"good", label:"Good Service", reasons:[], strike:false};
+    var worst = statuses[0];
+    statuses.forEach(function(s){ if (s.statusSeverity < worst.statusSeverity) worst = s; });
+    var desc = worst.statusSeverityDescription || "Unknown";
+    var lower = desc.toLowerCase();
+    var bucket;
+    if (lower.indexOf("good service") !== -1 || lower === "no issues") bucket = "good";
+    else if (lower.indexOf("closed") !== -1 || lower.indexOf("no service") !== -1 || lower === "not running") bucket = "closed";
+    else if (lower === "minor delays" || lower === "reduced service" || lower === "change of frequency" || lower === "information") bucket = "minor";
+    else bucket = severityBucket(worst.statusSeverity);
+    var reasons = [];
+    statuses.forEach(function(s){
+      if (s.reason && s.reason.trim()) reasons.push({text:s.reason.trim(), label:s.statusSeverityDescription});
+    });
+    var strike = reasons.some(function(r){ return STRIKE_RE.test(r.text); });
+    return {bucket:bucket, label:desc, reasons:reasons, strike:strike};
+  }
+  function bucketColor(b){
+    return b === "good" ? "var(--good)" : b === "minor" ? "var(--minor)" : b === "closed" ? "var(--ink-faint)" : "var(--severe)";
+  }
+
+  // ---------- 中文翻譯（只保留車站名稱為英文）----------
+  var STATUS_LABELS = {
+    "Good Service":"正常服務", "Minor Delays":"輕微延誤", "Severe Delays":"嚴重延誤",
+    "Part Suspended":"部分暫停服務", "Suspended":"暫停服務", "Part Closure":"部分路段關閉",
+    "Part Closed":"部分路段關閉", "Planned Closure":"計劃性關閉", "Special Service":"特別班次安排",
+    "Reduced Service":"班次減少", "No Service":"暫停服務", "Service Closed":"全線停駛",
+    "Closed":"關閉", "Not Running":"停駛", "Bus Service":"改以巴士接駁", "Diverted":"改道行駛",
+    "Change of frequency":"班次調整", "Exit Only":"只限出站", "No Step Free Access":"暫無無障礙通道",
+    "Issues Reported":"有事故報告", "No Issues":"沒有事故", "Information":"服務資訊",
+    "Disrupted":"服務受阻", "Unknown":"狀態不明"
+  };
+  function translateLabel(t){ return STATUS_LABELS[t] || "服務受影響"; }
+
+  var CAUSES = [
+    [/strike|industrial action|walk.?out/i, "罷工行動"],
+    [/signal(l?ing)?\s+(failure|fault|problem|issue)/i, "訊號故障"],
+    [/points?\s+(failure|fault|problem)/i, "路軌轉轍器故障"],
+    [/track\s+(fault|defect|problem)|defective track|broken rail/i, "路軌故障"],
+    [/power\s+(failure|supply|problem|outage)|loss of power/i, "電力故障"],
+    [/faulty train|train fault|defective train|broken.down train|failed train/i, "列車故障"],
+    [/customer (incident|taken ill)|ill customer|unwell customer|passenger (incident|taken ill)|medical emergency/i, "有乘客不適或發生乘客事故"],
+    [/person on the track|trespass/i, "有人闖入路軌"],
+    [/police|security alert|suspicious (item|package|object)/i, "警方調查或保安事故"],
+    [/\bfire\b|smoke/i, "火警"],
+    [/flood/i, "水浸"],
+    [/obstruction/i, "路軌上有障礙物"],
+    [/shortage of (staff|train operators|drivers|crew)|(staff|crew|driver|operator)s?\s+(shortage|availability)|lack of (staff|drivers)/i, "人手不足"],
+    [/overrunning( engineering)? works?/i, "工程超時"],
+    [/engineering works?|planned works?|improvement works?|upgrade works?|maintenance/i, "工程維修"],
+    [/weather|high winds?|\bsnow\b|\bice\b|high temperatures?|\bheat\b|leaves on the line|fallen tree|tree (on|across)/i, "天氣影響"],
+    [/train cancellations?/i, "列車取消"],
+    [/congestion|very busy|overcrowding/i, "車站擠迫"]
+  ];
+  var EXTRAS = [
+    [/replacement bus|rail replacement/i, "設有替代巴士服務"],
+    [/tickets?\s+(will be\s+|are\s+)?accepted|ticket acceptance/i, "車票可於其他合理路線（如巴士）使用"],
+    [/rest of the line/i, "其餘路段服務正常"],
+    [/(start|begin)s? later|later start|will not run before/i, "首班車將延遲開出"],
+    [/finish(es)? early|earlier finish|close early/i, "尾班車將提早開出"],
+    [/will not stop|not stopping|non.?stopping|station(s)? (is |are |will be )?closed/i, "部分車站暫停停靠或關閉"],
+    [/disruption (may|is likely to) continue|into the (following|next) (morning|day)|following morning/i, "翌日早上服務可能仍受影響"],
+    [/expect (severe )?disruption|extremely busy|very busy/i, "預計服務嚴重受阻，車站及車廂會較擠迫"],
+    [/check before you travel|plan ahead|allow (more|extra) time|journeys? (may|will) take longer|travel advice/i, "出行前請預留時間並查閱最新資訊"]
+  ];
+  var NOT_STATION = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December|Christmas|Easter|Good|No|Please|TfL|London|RMT|ASLEF|Unite|The|This|All|Bus|Buses)\b/;
+  var STN = "(?:St\\.|[A-Z][\\w'’\\-]*)(?:\\s+(?:(?:on|the|in|upon|le|of|under|&)\\s+)*(?:St\\.|[A-Z0-9][\\w'’\\-]*))*";
+
+  function cleanStation(s){
+    if (!s) return null;
+    s = s.replace(/\s+(Stations?|Line)$/,'').trim();
+    if (!s || NOT_STATION.test(s)) return null;
+    return s;
+  }
+  function pad2(n){ return (n < 10 ? "0" : "") + n; }
+
+  function translateMessage(text, label){
+    if (!text) return "";
+    var raw = text.replace(/^[A-Za-z&' -]+?(?:\s+line)?\s*:\s*/i, function(m){
+      return /strike|planned|update|info/i.test(m) || /line/i.test(m) || /^(DLR|Elizabeth|Trams?|Windrush|Weaver|Mildmay|Lioness|Liberty|Suffragette)\b/i.test(m) ? "" : m;
+    }).trim();
+
+    var impact = translateLabel(label);
+    var between = null, at = null, towards = null, closedStn = null, until = null;
+
+    var m = raw.match(new RegExp("\\b(?:between|from)\\s+(" + STN + ")\\s+(?:and|to)\\s+(" + STN + ")"));
+    if (m){
+      var a = cleanStation(m[1]), b = cleanStation(m[2]);
+      if (a && b) between = [a, b];
+    }
+    m = raw.match(new RegExp("\\bat\\s+(" + STN + ")"));
+    if (m) at = cleanStation(m[1]);
+    m = raw.match(new RegExp("\\btowards\\s+(" + STN + ")"));
+    if (m) towards = cleanStation(m[1]);
+    m = raw.match(new RegExp("(" + STN + ")\\s+[Ss]tation\\s+(?:is|will be|remains)\\s+closed"));
+    if (m) closedStn = cleanStation(m[1]);
+    m = raw.match(/\buntil\s+(\d{1,2})[:.]?(\d{2})\b/i);
+    if (m) until = pad2(+m[1]) + ":" + m[2];
+    else {
+      m = raw.match(/\buntil\s+(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm)\b/i);
+      if (m){ var h = +m[1] % 12 + (/pm/i.test(m[3]) ? 12 : 0); until = pad2(h) + ":" + (m[2] || "00"); }
+    }
+
+    var causes = [];
+    CAUSES.forEach(function(c){ if (c[0].test(raw) && causes.indexOf(c[1]) === -1) causes.push(c[1]); });
+    causes = causes.slice(0, 2);
+    var earlier = /\bearlier\b/i.test(raw);
+
+    var whole = /whole|entire|all of the|across the (network|line)|no service on the/i.test(raw) && !between;
+    var head;
+    if (between) head = between[0] + " 至 " + between[1] + " 之間" + impact;
+    else if (closedStn) head = closedStn + " 站關閉";
+    else if (whole) head = impact.indexOf("全線") === 0 ? impact : "全線" + impact;
+    else if (at && !causes.length) head = at + " 站一帶" + impact;
+    else head = impact;
+    if (towards) head += "（往 " + towards + " 方向）";
+
+    var parts = [head];
+    if (causes.length){
+      var where = (at && !closedStn) ? at + " 站" : "";
+      parts.push("原因：" + (earlier ? (where ? "早前在 " : "早前") : "") + where + causes.join("及"));
+    }
+    if (until) parts.push("預計持續至 " + until);
+    EXTRAS.forEach(function(e){ if (e[0].test(raw)) parts.push(e[1]); });
+    if (parts.length === 1 && !causes.length) parts.push("詳情請留意 TfL 官方公告");
+    return parts.join("。") + "。";
+  }
+
+  // ---------- 日期格式（倫敦時間）----------
+  var fmtDay = new Intl.DateTimeFormat('zh-Hant', {timeZone:'Europe/London', month:'numeric', day:'numeric', weekday:'short'});
+  var fmtTime = new Intl.DateTimeFormat('en-GB', {timeZone:'Europe/London', hour:'2-digit', minute:'2-digit', hour12:false});
+  var fmtKey = new Intl.DateTimeFormat('en-CA', {timeZone:'Europe/London', year:'numeric', month:'2-digit', day:'2-digit'});
+  function fmtPeriod(p){
+    var f = new Date(p.fromDate), t = new Date(p.toDate);
+    if (isNaN(f)) return "";
+    if (isNaN(t) || fmtKey.format(f) === fmtKey.format(t))
+      return fmtDay.format(f) + " " + fmtTime.format(f) + (isNaN(t) ? "" : "–" + fmtTime.format(t));
+    return fmtDay.format(f) + " " + fmtTime.format(f) + " 至 " + fmtDay.format(t) + " " + fmtTime.format(t);
+  }
+
+  // ---------- 罷工資料整理 ----------
+  function buildStrikes(future){
+    var now = Date.now(), horizon = now + STRIKE_DAYS * 864e5;
+    var groups = {};
+    (future || []).forEach(function(line){
+      (line.lineStatuses || []).forEach(function(s){
+        var text = (s.reason || "") + " " + (s.statusSeverityDescription || "");
+        if (!STRIKE_RE.test(text)) return;
+        var periods = (s.validityPeriods || []).filter(function(p){
+          var t = new Date(p.toDate).getTime(), f = new Date(p.fromDate).getTime();
+          return (!isNaN(t) ? t >= now : true) && (!isNaN(f) ? f <= horizon : true);
+        });
+        if (!periods.length && s.validityPeriods && s.validityPeriods.length) return;
+        var msg = translateMessage(s.reason || "", s.statusSeverityDescription);
+        var pKey = periods.map(function(p){ return p.fromDate + "|" + p.toDate; }).sort().join(",");
+        var key = msg.replace(/^全線|^[^。]*之間/, "") + "#" + pKey;
+        if (!groups[key]) groups[key] = {lines:[], periods:periods, msg:msg, orig:s.reason || "", label:s.statusSeverityDescription};
+        if (groups[key].lines.indexOf(line.id) === -1) groups[key].lines.push(line.id);
+      });
+    });
+    var list = Object.keys(groups).map(function(k){
+      var g = groups[k];
+      g.periods.sort(function(a,b){ return new Date(a.fromDate) - new Date(b.fromDate); });
+      g.start = g.periods.length ? new Date(g.periods[0].fromDate).getTime() : now;
+      g.isNow = g.periods.some(function(p){
+        return new Date(p.fromDate).getTime() <= now && new Date(p.toDate).getTime() >= now;
+      }) || !g.periods.length;
+      return g;
+    });
+    list.sort(function(a,b){ return a.start - b.start; });
+    return list;
+  }
+
+  function strikeSectionHtml(){
+    var html = '<div class="section-label strike">⚠︎ 未來 ' + STRIKE_DAYS + ' 日罷工消息</div>';
+    if (strikeData === null && !strikeError) return html + '<div class="strike-empty">正在查詢罷工消息…</div>';
+    if (strikeError && !strikeData) return html + '<div class="strike-empty">暫時未能取得罷工消息，請稍後再試。</div>';
+    if (!strikeData.length) return html + '<div class="strike-empty">✓ 未來 ' + STRIKE_DAYS + ' 日 TfL 未有公布任何罷工安排。</div>';
+    strikeData.forEach(function(g, i){
+      var multiLine = g.lines.length > 1;
+      var msg = multiLine ? g.msg.replace(/^全線/, "以上線路全線") : g.msg;
+      html += '<div class="strike-card">' +
+        '<div class="strike-top"><span class="strike-badge' + (g.isNow ? ' now' : '') + '">' + (g.isNow ? '罷工進行中' : '罷工預告') + '</span>' +
+          '<span class="status-text severe" style="font-size:13px;font-weight:600">' + escapeHtml(translateLabel(g.label)) + '</span></div>' +
+        '<div class="strike-lines">' + g.lines.map(function(id){
+          var m = metaFor(id);
+          return '<span class="line-pill"><i style="background:' + m.color + '"></i>' + escapeHtml(m.name) + '</span>';
+        }).join('') + '</div>' +
+        (g.periods.length ? '<div class="strike-dates">' + g.periods.slice(0,6).map(function(p){ return '<div>📅 ' + escapeHtml(fmtPeriod(p)) + '</div>'; }).join('') +
+          (g.periods.length > 6 ? '<div>…另有 ' + (g.periods.length - 6) + ' 個時段</div>' : '') + '</div>' : '') +
+        '<div class="strike-msg">' + escapeHtml(msg) + '</div>' +
+        (g.orig ? '<button class="orig-toggle" data-orig="s' + i + '">顯示英文原文</button><div class="orig" id="orig-s' + i + '">' + escapeHtml(g.orig) + '</div>' : '') +
+      '</div>';
+    });
+    return html;
+  }
+
+  function updateStrikeChip(){
+    var n = strikeData ? strikeData.length : 0;
+    document.getElementById('cStrike').textContent = strikeData ? n : '–';
+    document.getElementById('strikeChip').classList.toggle('has', n > 0);
+  }
+
+  // ---------- 畫面 ----------
+  function render(data){
+    updateStrikeChip();
+    if (currentFilter === "strike"){
+      $main.innerHTML = strikeSectionHtml();
+      $footer.style.display = 'block';
+      bindToggles();
+      return;
+    }
+    var items = data.map(function(line){
+      return {id:line.id, meta:metaFor(line.id, line.name), cls:classify(line)};
+    });
+    var order = {severe:0, minor:1, closed:2, good:3};
+    items.sort(function(a,b){
+      var d = order[a.cls.bucket] - order[b.cls.bucket];
+      return d !== 0 ? d : a.meta.name.localeCompare(b.meta.name);
+    });
+    var disruptedCount = items.filter(function(i){ return i.cls.bucket !== "good"; }).length;
+    document.getElementById('cAll').textContent = items.length;
+    document.getElementById('cDisrupted').textContent = disruptedCount;
+    document.getElementById('cGood').textContent = items.length - disruptedCount;
+
+    var filtered = items.filter(function(i){
+      if (currentFilter === "disrupted") return i.cls.bucket !== "good";
+      if (currentFilter === "good") return i.cls.bucket === "good";
+      return true;
+    });
+
+    var html = "";
+    if (currentFilter === "all" && strikeData && strikeData.length) html += strikeSectionHtml();
+
+    if (filtered.length === 0){
+      html += '<div class="state-block"><div class="big">' + (currentFilter === "disrupted" ? "目前沒有延誤 🎉" : "沒有符合的線路") + '</div>' +
+        '<div class="small">' + (currentFilter === "disrupted" ? "所有線路服務正常" : "") + '</div></div>';
+      $main.innerHTML = html; bindToggles(); return;
+    }
+
+    html += '<div class="section-label">即時狀況 · ' + filtered.length + ' 條線路</div>';
+    filtered.forEach(function(item){
+      var b = item.cls.bucket;
+      var hasDetail = item.cls.reasons.length > 0;
+      html += '<div class="line-card" id="card-' + item.id + '">' +
+        '<div class="line-row"' + (hasDetail ? ' role="button"' : '') + '>' +
+          '<div class="line-bar" style="background:' + item.meta.color + '"></div>' +
+          '<div class="line-info">' +
+            '<div class="line-name">' + escapeHtml(item.meta.name) + (item.cls.strike ? '<span class="strike-tag">罷工</span>' : '') + '</div>' +
+            '<div class="line-status"><span class="status-dot" style="background:' + bucketColor(b) + '"></span>' +
+              '<span class="status-text ' + b + '">' + escapeHtml(translateLabel(item.cls.label)) + '</span></div>' +
+          '</div>' +
+          (hasDetail ? '<div class="chevron"></div>' : '') +
+        '</div>' +
+        (hasDetail ? '<div class="line-detail"><div class="line-detail-inner">' +
+          item.cls.reasons.map(function(r){ return '<div class="msg">' + escapeHtml(translateMessage(r.text, r.label)) + '</div>'; }).join('') +
+          '<button class="orig-toggle" data-orig="' + item.id + '">顯示英文原文</button>' +
+          '<div class="orig" id="orig-' + item.id + '">' + item.cls.reasons.map(function(r){ return escapeHtml(r.text); }).join('<br><br>') + '</div>' +
+        '</div></div>' : '') +
+      '</div>';
+    });
+
+    if (currentFilter === "all" && (!strikeData || !strikeData.length)) html += strikeSectionHtml();
+
+    $main.innerHTML = html;
+    $footer.style.display = 'block';
+
+    filtered.forEach(function(item){
+      if (!item.cls.reasons.length) return;
+      var card = document.getElementById('card-' + item.id);
+      card.querySelector('.line-row').addEventListener('click', function(){ card.classList.toggle('expanded'); });
+    });
+    bindToggles();
+  }
+
+  function bindToggles(){
+    Array.prototype.forEach.call($main.querySelectorAll('.orig-toggle'), function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var el = document.getElementById('orig-' + btn.getAttribute('data-orig'));
+        var show = !el.classList.contains('show');
+        el.classList.toggle('show', show);
+        btn.textContent = show ? '隱藏英文原文' : '顯示英文原文';
+      });
+    });
+  }
+
+  function setUpdatedState(state, text){
+    $updatedDot.className = 'dot' + (state === 'stale' ? ' stale' : state === 'error' ? ' error' : '');
+    $updatedText.textContent = text;
+  }
+
+  // ---------- 取得資料 ----------
+  function isoDay(d){ return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()); }
+
+  function fetchStrikes(lineIds, force){
+    if (!force && Date.now() - lastStrikeFetch < STRIKE_REFRESH_MS && strikeData) return;
+    lastStrikeFetch = Date.now();
+    if (DEMO_MODE){ strikeData = buildStrikes(DEMO_FUTURE); if (lastData) render(lastData); return; }
+    var start = new Date(), end = new Date(); end.setDate(end.getDate() + STRIKE_DAYS);
+    var url = API_BASE + "/Line/" + lineIds.join(",") + "/Status/" + isoDay(start) + "/to/" + isoDay(end) + "?detail=false";
+    fetch(url, {cache:"no-store"})
+      .then(function(res){ if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function(data){ strikeData = buildStrikes(data); strikeError = false; })
+      .catch(function(){ strikeError = true; lastStrikeFetch = 0; })
+      .finally(function(){ if (lastData) render(lastData); });
+  }
+
+  function fetchStatus(isManual){
+    if (isManual) $refreshBtn.classList.add('spinning');
+    if (DEMO_MODE){
+      lastData = DEMO_DATA;
+      fetchStrikes([], true);
+      render(DEMO_DATA);
+      setUpdatedState('ok', '離線示範資料');
+      if (isManual) setTimeout(function(){ $refreshBtn.classList.remove('spinning'); }, 400);
+      return;
+    }
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function(){ controller.abort(); }, 15000);
+    fetch(API_BASE + "/Line/Mode/" + MODES + "/Status", {cache:"no-store", signal:controller.signal})
+      .then(function(res){ if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+      .then(function(data){
+        lastData = data;
+        render(data);
+        setUpdatedState('ok', '已更新 · ' + new Date().toLocaleTimeString('zh-Hant', {hour:'2-digit', minute:'2-digit'}));
+        fetchStrikes(data.map(function(l){ return l.id; }), isManual);
+      })
+      .catch(function(err){
+        if (lastData){ setUpdatedState('error', '更新失敗，顯示上次資料'); return; }
+        var isTimeout = err && err.name === 'AbortError';
+        $main.innerHTML = '<div class="state-block"><div class="big">' + (isTimeout ? '連線逾時' : '無法連線到 TfL') + '</div>' +
+          '<div class="small">請確認網絡可連線至 api.tfl.gov.uk。<br>想先看示範效果，可在網址後加上 <b>?demo</b>。</div>' +
+          '<button class="retry-btn" id="retryBtn">重試</button></div>';
+        document.getElementById('retryBtn').addEventListener('click', function(){ fetchStatus(true); });
+        setUpdatedState('error', isTimeout ? '連線逾時' : '連線失敗');
+      })
+      .finally(function(){
+        clearTimeout(timeoutId);
+        if (isManual) setTimeout(function(){ $refreshBtn.classList.remove('spinning'); }, 400);
+      });
+  }
+
+  $refreshBtn.addEventListener('click', function(){ fetchStatus(true); });
+  $filterStrip.addEventListener('click', function(e){
+    var btn = e.target.closest('.chip');
+    if (!btn) return;
+    currentFilter = btn.getAttribute('data-filter');
+    Array.prototype.forEach.call($filterStrip.querySelectorAll('.chip'), function(c){ c.classList.toggle('active', c === btn); });
+    if (lastData) render(lastData);
+  });
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible'){ fetchStatus(false); restartTimer(); }
+    else clearInterval(refreshTimer);
+  });
+  function restartTimer(){
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(function(){ fetchStatus(false); }, REFRESH_MS);
+  }
+
+  // ---------- 安裝成 App ----------
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^localhost$|^127\./.test(location.hostname))){
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  }
+
+  // 未安裝時顯示安裝教學
+  (function(){
+    var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    var tip = document.getElementById('installTip');
+    var dismissed = false;
+    try { dismissed = localStorage.getItem('tubeTipHidden') === '1'; } catch(e){}
+    if (standalone || dismissed) return;
+    var ua = navigator.userAgent;
+    var isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var isAndroid = /Android/.test(ua);
+    var msg;
+    if (location.protocol !== 'https:') msg = '<b>未能安裝：</b>請把整個資料夾放上 https 網址（例如 GitHub Pages / Netlify）再開啟。';
+    else if (isIOS && !/Safari/.test(ua) || isIOS && /CriOS|FxiOS|EdgiOS/.test(ua)) msg = '<b>安裝到 iPhone 桌面：</b>請改用 <b>Safari</b> 開啟此網址，再按「分享」→「加入主畫面」。';
+    else if (isIOS) msg = '<b>安裝到 iPhone 桌面：</b>按下方「分享」按鈕 → 「加入主畫面」→「新增」。';
+    else if (isAndroid) msg = '<b>安裝到 Android 桌面：</b>請先刪除舊的桌面捷徑，然後按右上角「安裝」，或 Chrome 選單 ⋮ →「安裝應用程式」。<br>如選單只見「加到主畫面」，請稍等數秒或重新整理一次再看。';
+    else return;
+    tip.innerHTML = '<button class="x" aria-label="關閉">×</button>' + msg;
+    tip.classList.add('show');
+    tip.querySelector('.x').addEventListener('click', function(){
+      tip.classList.remove('show');
+      try { localStorage.setItem('tubeTipHidden','1'); } catch(e){}
+    });
+    window.addEventListener('appinstalled', function(){ tip.classList.remove('show'); });
+  })();
+  var deferredPrompt = null;
+  var $installBtn = document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault(); deferredPrompt = e; $installBtn.classList.add('show');
+  });
+  $installBtn.addEventListener('click', function(){
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.finally(function(){ deferredPrompt = null; $installBtn.classList.remove('show'); });
+  });
+  window.addEventListener('appinstalled', function(){ $installBtn.classList.remove('show'); });
+
+  fetchStatus(false);
+  restartTimer();
+})();
+</script>
+</body>
+</html>
